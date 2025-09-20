@@ -1,6 +1,4 @@
-def main():
-    print("Hello from archive!")
+import asyncio
+import subprocess
 
-
-if __name__ == "__main__":
-    main()
+import mcp
