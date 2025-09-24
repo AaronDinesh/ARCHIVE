@@ -24,7 +24,7 @@ def _run(cmd: list[str]) -> str:
 
 def list_folders(use_cache: bool = True) -> List[str]:
     """
-    List all OneDrive folders (cached for 10 min).
+    List all OneDrive folders.
     """
     if use_cache and CACHE.exists() and (time.time() - CACHE.stat().st_mtime) < CACHE_TTL:
         data = json.loads(CACHE.read_text())

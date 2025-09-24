@@ -29,14 +29,14 @@ Return ONLY strict JSON.
     payload = {
         "model": model,
         "prompt": prompt,
-        "format": "json",            # force valid JSON content
+        "format": "json",           
         "options": {"temperature": 0},
-        "stream": False              # <-- critical: disable streaming
+        "stream": False              
     }
     r = requests.post("http://127.0.0.1:11434/api/generate", json=payload, timeout=300)
     r.raise_for_status()
     data = r.json()
-    # Ollama returns: {"model": "...", "created_at": "...", "response": "{...json...}", "done": true}
+
     txt = data.get("response", "").strip()
     return json.loads(txt)
 
@@ -77,11 +77,11 @@ def route(
 
     # System prompt with scoring rules
     system_prompt = """You are ARCHIVE, a pragmatic filing assistant. Given a document's extracted text and a list of OneDrive folders (relative paths), infer:
-- doc type (invoice|contract|memo|other),
+- doc type (invoice|contract|homework|other),
 - year (int or null),
 - up to 8 keywords.
 Score folders by:
-+2 if path implies type (contains 'invoice', 'contracts', 'memos' etc. as path segments),
++2 if path implies type (contains 'invoice', 'homeworks', 'tickets' etc. as path segments),
 +1 if year appears as a path segment,
 +2 per keyword overlap (cap 3).
 Return strict JSON:
@@ -102,7 +102,7 @@ Return candidates sorted by descending score (best first).
         "original_filename": p.name,
         "original_path": str(p),
         "extracted_text": text,
-        "folders": folders[:500]# cap to keep prompt size reasonable
+        "folders": folders[:10]
     }
 
     # Call LLM
@@ -128,11 +128,66 @@ Return candidates sorted by descending score (best first).
 
 
     # If just suggesting (no move), either print JSON or table
-    if not auto and not chosen:
-        if json_out:
-            print(json.dumps(resp, ensure_ascii=False))
-            return
+#     if not auto and not chosen:
+#         if json_out:
+#             print(json.dumps(resp, ensure_ascii=False))
+#             return
 
+#         print("\n[bold]Inferred[/bold]:", json.dumps(resp["inferred"], indent=2, ensure_ascii=False))
+#         cands = resp["candidates"]
+#         if cands:
+#             table = Table(title="Top Folders", show_header=True, header_style="bold", box=box.SIMPLE_HEAVY)
+#             table.add_column("Rank", style="bold")
+#             table.add_column("Path")
+#             table.add_column("Score", justify="right")
+#             table.add_column("Why")
+#             for i, c in enumerate(cands, start=1):
+#                 table.add_row(str(i), c.get("path",""), str(c.get("score","")), c.get("why",""))
+#             print(table)
+
+#         # Filename proposal
+#         date_str = today()
+#         inferred = resp["inferred"]
+#         proposed = resp["proposed_filename"] or smart_filename(inferred, p.name, date_str)
+#         print(f"[bold]Proposed filename:[/bold] {proposed}")
+#         print("\nNext: run with --auto to move to the top candidate, or pass a folder with --chosen.")
+#         return
+
+#    # Prefer explicit --chosen. Otherwise take top-ranked candidate.
+#     # if chosen:
+#     #     dest_folder = chosen
+#     # else:
+#     #     dest_folder = resp["candidates"][0]["path"] if resp["candidates"] else (resp.get("chosen_folder") or None)
+
+#     # if not chosen and resp.get("chosen_folder") and resp["candidates"]:
+#     #     if resp["candidates"][0]["path"] != resp["chosen_folder"]:
+#     #         print(f"[yellow]Note:[/yellow] Model suggested '{resp['chosen_folder']}', "
+#     #             f"but top-ranked is '{resp['candidates'][0]['path']}'. Using top-ranked.")
+            
+#    # Decide destination
+#     if chosen:
+#         dest_folder = chosen
+#     elif auto:
+#         # Always take the top-ranked candidate for --auto
+#         dest_folder = resp["candidates"][0]["path"] if resp["candidates"] else None
+#     else:
+#         # Fallback if neither auto nor chosen
+#         dest_folder = resp.get("chosen_folder") or (resp["candidates"][0]["path"] if resp["candidates"] else None)
+
+#     # Safety check
+#     if not dest_folder:
+#         typer.secho("No candidate folder available.", fg=typer.colors.RED)
+#         raise typer.Exit(1)
+
+#     # Filename
+#     date_str = today()
+#     inferred = resp["inferred"]
+#     proposed = resp["proposed_filename"] or smart_filename(inferred, p.name, date_str)
+
+    # Show table of candidates
+    if json_out:
+        print(json.dumps(resp, ensure_ascii=False))
+    else:
         print("\n[bold]Inferred[/bold]:", json.dumps(resp["inferred"], indent=2, ensure_ascii=False))
         cands = resp["candidates"]
         if cands:
@@ -150,22 +205,22 @@ Return candidates sorted by descending score (best first).
         inferred = resp["inferred"]
         proposed = resp["proposed_filename"] or smart_filename(inferred, p.name, date_str)
         print(f"[bold]Proposed filename:[/bold] {proposed}")
+
+    # Decide destination
+    if chosen:
+        dest_folder = chosen
+    elif auto:
+        # Always take the top-ranked candidate for --auto
+        dest_folder = resp["candidates"][0]["path"] if resp["candidates"] else None
+        print(f"[cyan]Auto mode:[/cyan] picking top-ranked folder → {dest_folder}")
+    else:
         print("\nNext: run with --auto to move to the top candidate, or pass a folder with --chosen.")
         return
 
-    # Decide destination
-    dest_folder = chosen or resp["chosen_folder"]
-    if not dest_folder:
-        dest_folder = (resp["candidates"][0]["path"] if resp["candidates"] else None)
+    # Safety check
     if not dest_folder:
         typer.secho("No candidate folder available.", fg=typer.colors.RED)
         raise typer.Exit(1)
-
-    # Filename
-    date_str = today()
-    inferred = resp["inferred"]
-    proposed = resp["proposed_filename"] or smart_filename(inferred, p.name, date_str)
-
 
     if allow_create:
         print(f"[bold]Ensuring path[/bold]: {dest_folder}")
