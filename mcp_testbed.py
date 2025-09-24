@@ -9,7 +9,7 @@ from pydantic import AnyUrl
 # Create server parameters for stdio connection
 server_params = StdioServerParameters(
     command="uv",  # Using uv to run the server
-    args=["run", "rclone_mcp.py"],
+    args=["run", "./tools/rclone_io_mcp.py"],
     env={"UV_INDEX": os.environ.get("UV_INDEX", "")},
 )
 
@@ -49,7 +49,15 @@ async def run():
             print(f"Available tools: {[t.name for t in tools.tools]}")
 
             # Call a tool (add tool from fastmcp_quickstart)
-            result = await session.call_tool("listremotes")
+            # result = await session.call_tool("listremotes")
+            result = await session.call_tool(
+                "copy",
+                arguments={
+                    "remote": "OneDrive:",
+                    "local_path": "./uv.lock",
+                    "remote_path": "/",
+                },
+            )
             # result_unstructured = result.content[0]
             # if isinstance(result_unstructured, types.TextContent):
             #     print(f"Tool result: {result_unstructured.text}")
